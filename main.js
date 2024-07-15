@@ -152,11 +152,14 @@ function onDocumentKeyUp(e) {
 //-- Animate --//
 const clock = new THREE.Clock();
 function animate() {
+    const dt = clock.getDelta();
     if (bear != undefined) {
-        bear.translateOnAxis(bear_velocity_direction, bear_speed * clock.getDelta());
-        // bear.lookAt(bear_velocity_direction + bear_position);
-        bear.setRotationFromEuler(new THREE.Euler(bear_velocity_direction.x, bear_velocity_direction.y, bear_velocity_direction.z));
-        console.log(bear.rotation);
+        if (bear_velocity_direction.length() > 0) {
+            const pos = new THREE.Vector3();
+            pos.addVectors(bear_velocity_direction, bear.position);
+            bear.lookAt(pos);
+            bear.translateZ(bear_speed * dt);
+        }
     }
     renderer.render(scene, camera);
 }
