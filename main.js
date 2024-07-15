@@ -34,13 +34,6 @@ scene.add(light);
 const ambientLight = new THREE.AmbientLight(0x404040, 2);
 scene.add(ambientLight);
 
-//-- Animate --//
-function animate() {
-    //camera.rotateOnAxis(new THREE.Vector3(0, 1, 0), 0.01);
-    renderer.render(scene, camera);
-}
-renderer.setAnimationLoop(animate);
-
 function get_size(gltf_object) {
     const box = new THREE.Box3().setFromObject( gltf_object ); 
     return box.getSize(new THREE.Vector3());
