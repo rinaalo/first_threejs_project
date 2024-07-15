@@ -100,3 +100,64 @@ loader.load('assets/pillar.glb', function (gltf) {
     console.error(error);
 });
 
+
+//-- bear movement --//
+const bear_speed = 5;
+const directions = {
+    "up":       new THREE.Vector3(-1,  0, -1),
+    "right":    new THREE.Vector3( 1,  0, -1),
+    "down":     new THREE.Vector3( 1,  0,  1),
+    "left":     new THREE.Vector3(-1,  0,  1),
+}
+let bear_velocity_direction = new THREE.Vector3();
+const keys_pressed = {
+    "ArrowUp": false,
+    "ArrowRight": false,
+    "ArrowDown": false,
+    "ArrowLeft": false,
+}
+
+//-- axes helper --//
+const axesHelper = new THREE.AxesHelper( 5 );
+scene.add( axesHelper );
+
+//-- keyboard input --//
+function updateDirection() {
+    const newDirection = new THREE.Vector3();
+    if (keys_pressed.ArrowUp) {
+        newDirection.addVectors(newDirection, directions.up);
+    }
+    if (keys_pressed.ArrowRight) {
+        newDirection.addVectors(newDirection, directions.right);
+    }
+    if (keys_pressed.ArrowDown) {
+        newDirection.addVectors(newDirection, directions.down);
+    }
+    if (keys_pressed.ArrowLeft) {
+        newDirection.addVectors(newDirection, directions.left);
+    }
+    bear_velocity_direction = newDirection.normalize();
+}
+document.addEventListener("keydown", onDocumentKeyDown, false);
+function onDocumentKeyDown(e) {
+    keys_pressed[e.key] = true;
+    updateDirection();
+};
+document.addEventListener("keyup", onDocumentKeyUp, false);
+function onDocumentKeyUp(e) {
+    keys_pressed[e.key] = false;
+    updateDirection();
+}
+
+//-- Animate --//
+const clock = new THREE.Clock();
+function animate() {
+    if (bear != undefined) {
+        bear.translateOnAxis(bear_velocity_direction, bear_speed * clock.getDelta());
+        // bear.lookAt(bear_velocity_direction + bear_position);
+        bear.setRotationFromEuler(new THREE.Euler(bear_velocity_direction.x, bear_velocity_direction.y, bear_velocity_direction.z));
+        console.log(bear.rotation);
+    }
+    renderer.render(scene, camera);
+}
+renderer.setAnimationLoop(animate);
