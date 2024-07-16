@@ -2,14 +2,15 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const scene = new THREE.Scene();
-const d = 10;
+const cameraDistance = 10;
+const cameraverticalOffset = 2;
 const aspectRatio = innerWidth / innerHeight;
 //const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
-const camera = new THREE.OrthographicCamera(-d * aspectRatio, d * aspectRatio, d, -d, 1, 1000);
+const camera = new THREE.OrthographicCamera(-cameraDistance * aspectRatio, cameraDistance * aspectRatio, cameraDistance, -cameraDistance, 1, 1000);
 const renderer = new THREE.WebGLRenderer();
 
-camera.position.set(d, d, d);
-camera.lookAt(new THREE.Vector3(0, 0, 0))
+camera.position.set(cameraDistance, cameraDistance + cameraverticalOffset, cameraDistance);
+camera.lookAt(new THREE.Vector3(0, cameraverticalOffset, 0))
 
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -25,8 +26,6 @@ plane.position.set(0, 0, 0);
 plane.rotation.x = Math.PI / 2
 scene.add(plane);
 
-const pillar_padding = 5;
-
 //-- Light stuff --//
 const light = new THREE.DirectionalLight(0xffc0b0, 2);
 light.position.set(0, 1, 0);
@@ -34,7 +33,8 @@ scene.add(light);
 const ambientLight = new THREE.AmbientLight(0x404040, 2);
 scene.add(ambientLight);
 
-function get_size(gltf_object) {
+//-- Loading Auxiliary Functions --//
+function getSize(gltf_object) {
     const box = new THREE.Box3().setFromObject( gltf_object ); 
     return box.getSize(new THREE.Vector3());
 }
@@ -44,8 +44,8 @@ const loader = new GLTFLoader();
 let bear;
 loader.load('assets/character1.glb', function (gltf) {
     bear = gltf.scene;
-    const bear_size = get_size(bear);
-    bear.position.set(5, bear_size.y/2 + 0.5, 0);
+    const bear_size = getSize(bear);
+    bear.position.set(5, bear_size.y/2 + 0.5, 0); // TODO demagicnumberify this
     scene.add(bear);
 }, undefined, function (error) {
     console.error(error);
@@ -53,46 +53,27 @@ loader.load('assets/character1.glb', function (gltf) {
 
 
 //-- Load pillars --//
-let pillar1;
 loader.load('assets/pillar.glb', function (gltf) {
-    pillar1 = gltf.scene;
-    const pillar1_size = get_size(pillar1);
-    pillar1.position.set(-plane_width/2 + pillar1_size.z/2, pillar1_size.y/2, -plane_height/2 + pillar1_size.z/2);
-    scene.add(pillar1);
+    const pillar_model_template = gltf.scene;
+    const pillar_models = [pillar_model_template, pillar_model_template.clone(), pillar_model_template.clone(), pillar_model_template.clone()];
+    const pillar_size = getSize(pillar_model_template);
+    const pillar_edge_padding = 2;
+    const pillar_padding = pillar_size.z / 2 + pillar_edge_padding;
+    const pillar_vertical_padding = pillar_size.y / 2;
+    pillar_models[0].position.set(-plane_width/2 + pillar_padding, pillar_vertical_padding, -plane_height/2 + pillar_padding);
+    pillar_models[1].position.set( plane_width/2 - pillar_padding, pillar_vertical_padding, -plane_height/2 + pillar_padding);
+    pillar_models[2].position.set(-plane_width/2 + pillar_padding, pillar_vertical_padding,  plane_height/2 - pillar_padding);
+    pillar_models[3].position.set( plane_width/2 - pillar_padding, pillar_vertical_padding,  plane_height/2 - pillar_padding);
+    scene.add(...pillar_models);
+    // Add colliders
+    for (const model of pillar_models) {
+        const model_box = new THREE.Box3().setFromObject(model);
+        obstacles.push(model_box);
+        // scene.add(new THREE.Box3Helper(model_box, 0xffff00 ));
+    }
 }, undefined, function (error) {
     console.error(error);
 });
-
-let pillar2;
-loader.load('assets/pillar.glb', function (gltf) {
-    pillar2 = gltf.scene;
-    const pillar2_size = get_size(pillar2);
-    pillar2.position.set(-plane_width/2 + pillar2_size.z/2, pillar2_size.y/2, plane_height/2 - pillar2_size.z/2);
-    scene.add(pillar2);
-}, undefined, function (error) {
-    console.error(error);
-});
-
-let pillar3;
-loader.load('assets/pillar.glb', function (gltf) {
-    pillar3 = gltf.scene;
-    const pillar3_size = get_size(pillar3);
-    pillar3.position.set(plane_width/2 - pillar3_size.z/2, pillar3_size.y/2, plane_height/2 - pillar3_size.z/2);
-    scene.add(pillar3);
-}, undefined, function (error) {
-    console.error(error);
-});
-
-let pillar4;
-loader.load('assets/pillar.glb', function (gltf) {
-    pillar4 = gltf.scene;
-    const pillar4_size = get_size(pillar4);
-    pillar4.position.set(plane_width/2 - pillar4_size.z/2, pillar4_size.y/2, - plane_height/2 + pillar4_size.z/2);
-    scene.add(pillar4);
-}, undefined, function (error) {
-    console.error(error);
-});
-
 
 //-- bear movement --//
 const bear_speed = 5;
@@ -111,8 +92,8 @@ const keys_pressed = {
 }
 
 //-- axes helper --//
-const axesHelper = new THREE.AxesHelper( 5 );
-scene.add( axesHelper );
+// const axesHelper = new THREE.AxesHelper( 5 );
+// scene.add( axesHelper );
 
 //-- keyboard input --//
 function updateDirection() {
@@ -142,6 +123,19 @@ function onDocumentKeyUp(e) {
     updateDirection();
 }
 
+//-- Colliders --//
+const collisionForce = 2;
+const obstacles = [];
+function collide(movee, colliders, dt) {
+    const movee_box = new THREE.Box3().setFromObject(movee);
+    for (const collider of colliders) {
+        if (movee_box.intersectsBox(collider)) {
+            const displacementVector = new THREE.Vector3().subVectors(movee.position, collider.getCenter(new THREE.Vector3())).setComponent(1, 0);
+            movee.position.addScaledVector(displacementVector, collisionForce * dt);
+        }
+    }
+}
+
 //-- Animate --//
 const clock = new THREE.Clock();
 function animate() {
@@ -153,6 +147,7 @@ function animate() {
             bear.lookAt(pos);
             bear.translateZ(bear_speed * dt);
         }
+        collide(bear, obstacles, dt);
     }
     renderer.render(scene, camera);
 }
